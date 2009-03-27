@@ -63,7 +63,7 @@ void SetPWM()
 	//非算法控制通道强制直接输出
 	//PWMCodeOut[2]=PWMCodeIn[2];
 	//PWMCodeOut[3]=PWMCodeIn[3];
-	PWMCodeOut[4]=PWMCodeIn[4];
+	//PWMCodeOut[4]=PWMCodeIn[4];
 	PWMCodeOut[5]=PWMCodeIn[5];
 	PWMCodeOut[6]=PWMCodeIn[6];
 	PWMCodeOut[7]=PWMCodeIn[7];
