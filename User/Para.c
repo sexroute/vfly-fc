@@ -118,6 +118,7 @@ volatile FCFrameStruct FCFrameObj;
 //On BlockNum=0
 //收集中位数据的标志位
 volatile uint8 CollectMedianDataState;
+volatile uint8 CollectMedianPosYaw;
 //For F
 //回发标志位,0-255代表最多256个协,0不使用.
 volatile uint8 DataSendFlag[256]={0};//0-2位分别代表单次回发，连续回发，数据记录

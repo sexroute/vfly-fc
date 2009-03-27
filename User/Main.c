@@ -23,6 +23,11 @@ uint8 ChangeRunMode(uint8 Mode)
 	{
 		if(RunState!=Mode)
 		{
+			if(Mode>=MODETarget0&&Mode<=MODETargetX)
+			{//新加的获取中位函数；
+				CollectMedianPosYaw=0;
+			}
+			
 			RunState=Mode;
 			FCEventSend(RunState);
 		}
@@ -100,19 +105,21 @@ void SwitchMode()
 		}
 		if(AutoCount>5)
 		{
+			
 			SwitchMODEAuto;
 			if(RunState==MODEManual)
 			{
 				OnSwitchAuto=0;				
 			}
-			//新加的获取中位函数；
-			//FCACollectPosYaw(40);
+						
 			ChangeRunMode(PreAutoMode);
 			ManualCount=0;
 			AutoCount=0;
 		}
 		if(ManualCount>5)
 		{
+			
+			
 			SwitchMODEManual;
 			ChangeRunMode(MODEManual);
 			ManualCount=0;
@@ -154,7 +161,7 @@ int main (void)
 	//Test();
 	//Init
 	InitDevice();
-	InitPara();
+	
 	
 	//Send Startup Message
 	FCMessageSend("vFlyOK");
@@ -165,7 +172,10 @@ int main (void)
 	//改变运行状态并发送状态信息
 	RunState=DefaultRunState;
 	FCEventSend(RunState);
-
+	//初始化参数
+	InitPara();
+	FCMessageSend("InitParaOK");
+		
 	//启动主计时器
 	TimerEnable(0);
 	
@@ -183,14 +193,11 @@ int main (void)
 			//FCA();
 			//FCALimitPWM(void);
 			FCAGetNav();
-			FCAPosXY();
-			FCAVelXY();
-			FCAYaw();
-			FCAHei();
 			FCAPWMOut();
 			SmoothPWM(40);
 			SetPWM();
 			//CollectMedianDataFun(40);
+			FCACollectPosYaw(5);
 			FCACollectMedianDataFun(40);
 			FCFrameProcess();
 			if(MainLoopRunCounter%DataSendDF==0)

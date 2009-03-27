@@ -34,21 +34,24 @@ void FCALimitPWM()
 	}
 }
 
+float FCAPostmp[3] = {0};
+
 //获取导航信息和遥控器控制量信息
 void FCAGetNav()
 {
 	float yy;
+	float posx,posy;
 		
 	//导航系位置 m
 	LTLK=cos((double)INSFrameObj.La*3.14/180.0/600000.0);
-	FCAOutData[7][0]=INSFrameObj.La*MtMk;
-	FCAOutData[7][1]=INSFrameObj.Lo*LTLK*MtMk;
-	FCAOutData[7][2]=INSFrameObj.Height/1000;
+	FCAPostmp[0]=INSFrameObj.La*MtMk;
+	FCAPostmp[1]=INSFrameObj.Lo*LTLK*MtMk;
+	FCAPostmp[2]=INSFrameObj.Height/1000;
 	
-	//20090318 使用中位位置作为位置起点；
-	FCAOutData[7][0]-=FCAMedianData[0][0];
-	FCAOutData[7][1]-=FCAMedianData[0][1];
-	FCAOutData[7][2]-=FCAMedianData[0][2];
+	FCAOutData[7][0]=FCAPostmp[0]-FCAMedianData[0][0];
+	FCAOutData[7][1]=FCAPostmp[1]-FCAMedianData[0][1];
+	FCAOutData[7][2]=FCAPostmp[2]-FCAMedianData[0][2];
+	
 	
 	//导航系速度 m/s
 	FCAOutData[8][0]=INSFrameObj.SpeedN/100.0;
@@ -64,14 +67,19 @@ void FCAGetNav()
 	FCAOutData[10][1]=INSFrameObj.AngVeloBodyX/100.0; //roll
 	FCAOutData[10][2]=INSFrameObj.AngVeloBodyZ/100.0; //yaw
 	
+	
 	//pp=(-FCAOutData[9][0]) * 3.1415926 / 180;
 	//rr=FCAOutData[9][1] * 3.1415926 / 180;
 	yy=FCAOutData[9][2] * 3.1415926 / 180;
 	
 	//本体系位置（纠正航向角）
-	FCAOutData[11][0]= cos(yy) * FCAOutData[7][0] + sin(yy) * FCAOutData[7][1];
-	FCAOutData[11][1]=(-sin(yy)) * FCAOutData[7][0] + cos(yy) * FCAOutData[7][1];
-	FCAOutData[11][2]= FCAOutData[7][2];		//z轴向上；
+	//20090318 使用中位位置作为位置起点；
+	posx=FCAOutData[7][0];//-FCAMedianData[0][0];
+	posy=FCAOutData[7][1];//-FCAMedianData[0][1];
+	
+	FCAOutData[11][0]= cos(yy) * posx + sin(yy) * posy;
+	FCAOutData[11][1]=(-sin(yy)) * posx + cos(yy) * posy;
+	FCAOutData[11][2]= FCAOutData[7][2];//-FCAMedianData[0][2]		//z轴向上；
 
 	//本体系速度1 1m/s
 	FCAOutData[12][0]=INSFrameObj.SpeedBodyX/100.0;
@@ -92,10 +100,10 @@ void FCAGetNav()
 	
 	FCAOutData[5][0]=PWMIn[3];//总距
 	FCAOutData[5][1]=PWMIn[4];//油门
-	//切换，陀螺仪感度、转速控制器
-	FCAOutData[6][0]=PWMIn[6];
-	FCAOutData[6][1]=PWMIn[7];
-	FCAOutData[6][2]=PWMIn[8];
+	//切换，陀螺仪感度、转速控制器 -- 更改为算法输出量；
+	//FCAOutData[6][0]=PWMIn[6];
+	//FCAOutData[6][1]=PWMIn[7];
+	//FCAOutData[6][2]=PWMIn[8];
 }
 
 
@@ -103,48 +111,45 @@ void FCAGetNav()
 fp32 FCAMedianDataTmp[6][3];
 
 
-/*void FCACollectPosYaw(uint8 Long)
+void FCACollectPosYaw(uint8 Long)
 {
 	uint8 i;
-	if(CollectMedianDataState==0)
+	if(CollectMedianPosYaw==0)
 	{
 		memset(FCAMedianDataTmp,0,sizeof(fp32)*3*6);
 	}
-	if(CollectMedianDataState<Long)
+	if(CollectMedianPosYaw<Long)
 	{
 
 		for(i=0;i<3;i++)
 		{
-			FCAMedianDataTmp[0][i]+=FCAOutData[7][i];//导航系位置；
+			FCAMedianDataTmp[0][i]+=FCAPostmp[i];//导航系位置；
 			//FCAMedianDataTmp[1][i]+=FCAOutData[12][i];//本体系速度 ，实际上一直为零；
 			FCAMedianDataTmp[2][i]+=FCAOutData[9][i];//姿态；
 			//FCAMedianDataTmp[3][i]+=FCAOutData[10][i];//角速度，实际上应该为零；
 			//FCAMedianDataTmp[4][i]+=FCAOutData[4][i];//控制量：俯仰、滚转、偏航；
 			//FCAMedianDataTmp[5][i]+=FCAOutData[5][i];//控制量：总距，油门；
 		}
-		CollectMedianDataState++;
+		CollectMedianPosYaw++;
 	}
-	else if(CollectMedianDataState==Long)
+	else if(CollectMedianPosYaw==Long)
 	{
 		//位置
-		FCAMedianData[0][0] = FCAMedianDataTmp[0][0];
-		FCAMedianData[0][1] = FCAMedianDataTmp[0][1];
-		FCAMedianData[0][2] = FCAMedianDataTmp[0][2];
+		FCAMedianData[0][0] = FCAMedianDataTmp[0][0]/(Long*1.0);
+		FCAMedianData[0][1] = FCAMedianDataTmp[0][1]/(Long*1.0);
+		FCAMedianData[0][2] = FCAMedianDataTmp[0][2]/(Long*1.0);
 		//航向角
-		FCAMedianData[2][2] = FCAMedianDataTmp[2][2];
-
+		FCAMedianData[2][2] = FCAMedianDataTmp[2][2]/(Long*1.0);
+		//屏蔽掉发送函数；
 		FCEventSend(CollectMedianData);
 		DataSendFlag[0x60]=DataSendFlag[0x60]|0x01;
-		//DataSendFlag[0x61]=DataSendFlag[0x61]|0x01;
 		DataSendFlag[0x62]=DataSendFlag[0x62]|0x01;
-		//DataSendFlag[0x63]=DataSendFlag[0x63]|0x01;
-		//DataSendFlag[0x64]=DataSendFlag[0x64]|0x01;
-		//DataSendFlag[0x65]=DataSendFlag[0x65]|0x01;
-		CollectMedianDataState=0xFF;
+
+		CollectMedianPosYaw=0xFF;
 	}
 	i_x = 0;i_y=0;i_h=0;i_yaw = 0;
 }
-*/
+
 
 void FCACollectMedianDataFun(uint8 Long)
 {
@@ -158,7 +163,7 @@ void FCACollectMedianDataFun(uint8 Long)
 
 		for(i=0;i<3;i++)
 		{
-			FCAMedianDataTmp[0][i]+=FCAOutData[7][i];//导航系位置；
+			FCAMedianDataTmp[0][i]+=FCAPostmp[i];//导航系位置；
 			FCAMedianDataTmp[1][i]+=FCAOutData[12][i];//本体系速度 ，实际上一直为零；
 			FCAMedianDataTmp[2][i]+=FCAOutData[9][i];//姿态；
 			FCAMedianDataTmp[3][i]+=FCAOutData[10][i];//角速度，实际上应该为零；
@@ -194,8 +199,6 @@ void FCAPosXY()
 	float yy;
 	float x_tmp, y_tmp;
 	
-	float x_median, y_median;
-	
 	float x_now, y_now;
 	float x_tar, y_tar;
 	float d_x,d_y;
@@ -204,30 +207,26 @@ void FCAPosXY()
 	float x_cmd, y_cmd;			//上位机、
 	float dt =0.025;
 
-	// 1. 悬停中位中的位置为位置起点；由NE转化为x，y；
-	//悬停点位置为导航系；所以需要准换；根据航向随时转换；
-	yy=FCAOutData[9][2] * 3.1415926 / 180;
-	
-	//本体系位置（纠正航向角）
-	x_median= cos(yy) * FCAMedianData[0][0] + sin(yy) * FCAMedianData[0][1];
-	y_median=(-sin(yy)) * FCAMedianData[0][0] + cos(yy) * FCAMedianData[0][1];
 	
 	// 2. 获取当前位置：本体系相对距离
-	x_now = FCAOutData[11][0]-x_median;
-	y_now = FCAOutData[11][1]-y_median;
+	x_now = FCAOutData[11][0];//-x_median;
+	y_now = FCAOutData[11][1];//-y_median;
 		
 	// 3. 根据上位机指令获取目标悬停位置：导航系NE；可以升级为改变时解析
-	x_tmp = FCATarData[0][0]-FCAMedianData[0][0];
-	y_tmp = FCATarData[0][1]-FCAMedianData[0][1];
+	yy=FCAOutData[9][2] * 3.1415926 / 180;
+
+	x_tmp = FCATarData[0][0];//-FCAMedianData[0][0];
+	y_tmp = FCATarData[0][1];//-FCAMedianData[0][1];
 	
 	x_cmd = cos(yy) * x_tmp + sin(yy) * y_tmp;
 	y_cmd = (-sin(yy)) * x_tmp+cos(yy) * y_tmp;
 	
 	// 4. 遥控器接口:在位置遥控器模式下给定的是本体系位置增量；
-	if(RunState==MODETargetX)
+	if(RunState==MODETargetX && FCATarData[2][1]==1)
 	{
-		x_rem = FCAOutData[4][0]*20;	//+-20m;出死区范围了；
-		y_rem = FCAOutData[4][1]*20;
+		//需要减去悬停点中位
+		x_rem = (FCAOutData[4][0]-FCAMedianData[4][0])*20;	//+-20m;出死区范围了；
+		y_rem = (FCAOutData[4][1]-FCAMedianData[4][1])*20;
 	}
 	else
 	{
@@ -241,10 +240,10 @@ void FCAPosXY()
 	d_y = y_tar - y_now;
 	
 	//死区范围查询:矩形
-	if( d_x < FCAKData[1][0] && d_x > (-FCAKData[1][0]) )
+	if( d_x <= FCAKData[1][0] && d_x >= (-FCAKData[1][0]) )
 		d_x = d_x * FCAKData[1][1];
 	
-	if( d_y < FCAKData[3][0] && d_y > (-FCAKData[3][0]) )
+	if( d_y <= FCAKData[3][0] && d_y >= (-FCAKData[3][0]) )
 		d_y = d_y * FCAKData[3][1];
 	
 	//积分；抗饱和积分,判断上次误差限
@@ -351,10 +350,10 @@ void FCAVelXY()
 	// 3. 遥控器接口
 	
 	// 1速度遥控
-	if(RunState==MODETargetV)
+	if(RunState==MODETargetV && FCATarData[2][1]==1)
 	{
-		u_rem = FCAOutData[4][0]*50;	//-5~5 对应 -0.5m/s~0.5m/s
-		v_rem = FCAOutData[4][1]*50; //
+		u_rem = (FCAOutData[4][0]-FCAMedianData[4][0])*50;	//-5~5 对应 -0.5m/s~0.5m/s
+		v_rem = (FCAOutData[4][1]-FCAMedianData[4][1])*50; //
 	}
 	else
 	{
@@ -362,10 +361,10 @@ void FCAVelXY()
 		v_rem = 0;
 	}	
 	// 1姿态遥控
-	if(RunState==MODETargetP)
+	if(RunState==MODETargetP && FCATarData[2][1]==1)
 	{
-		pit_rem = FCAOutData[4][0]*50;  //-1~1 对应 -50°~50°
-		rol_rem = FCAOutData[4][1]*100;	//-1~1 对应 -100°~100°
+		pit_rem = (FCAOutData[4][0]-FCAMedianData[4][0])*50;  //-1~1 对应 -50°~50°
+		rol_rem = (FCAOutData[4][1]-FCAMedianData[4][1])*100;	//-1~1 对应 -100°~100°
 	}
 	else
 	{
@@ -374,9 +373,16 @@ void FCAVelXY()
 	}
 		
 	// 4.位置闭环
-	u_pos = FCAOutData[0][0];
-	v_pos = FCAOutData[0][1];
-	
+	if(FCATarData[2][0]==1)
+	{
+		u_pos = FCAOutData[0][0];
+		v_pos = FCAOutData[0][1];
+	}
+	else
+	{
+		u_pos = 0;
+		v_pos = 0;
+	}
 	//****************************比较差值**********************************
 	u_tar = u_pos + u_rem + u_cmd;
 	d_u = u_tar - u_now;
@@ -391,9 +397,9 @@ void FCAVelXY()
 	d_rol = rol_tar-rol_now;
 	
 	//俯仰
-	FCAOutData[2][0]=FCAKData[4][0]*d_u + FCAKData[4][1]*d_pit - FCAKData[4][2]*p + FCAKData[5][1]*d_v + FCAKData[5][2]*d_rol;
+	FCAOutData[2][0]=FCAKData[4][0]*d_u + FCAKData[4][1]*d_pit + FCAKData[4][2]*p + FCAKData[5][1]*d_v + FCAKData[5][2]*d_rol;
 	//滚转
-	FCAOutData[2][1]=FCAKData[6][0]*d_v + FCAKData[6][1]*d_rol - FCAKData[6][2]*q + FCAKData[7][1]*d_u + FCAKData[7][2]*d_pit;
+	FCAOutData[2][1]=FCAKData[6][0]*d_v + FCAKData[6][1]*d_rol + FCAKData[6][2]*q + FCAKData[7][1]*d_u + FCAKData[7][2]*d_pit;
 	
 	//更新反馈量
 	FCAOutData[14][0]=u_tar;
@@ -424,9 +430,9 @@ void FCAYaw()
 	yaw_now = FCAOutData[9][2];//-FCAMedianData[2][2]; //(0~359)-(0~359) 在-180~+180之间
 	
 	//位置遥控,姿态遥控，速率遥控；
-	if(RunState >= MODETargetP&&RunState <= MODETargetX)
+	if(RunState >= MODETargetP&&RunState <= MODETargetX&& FCATarData[2][1]==1)
 	{
-		yaw_rem = FCAOutData[4][2]*30;		//当前角度的范围：航向角+-15度；
+		yaw_rem = (FCAOutData[4][2]-FCAMedianData[4][2])*30;		//当前角度的范围：航向角+-15度；
 	}
 	else
 		yaw_rem = 0;
@@ -476,7 +482,7 @@ void FCAYaw()
 	d_r_last = d_r;
 	
 	//PD 输出舵量
-	FCAOutData[2][2] = FCAKData[10][0] * d_r - FCAKData[10][1]*dd_r;	
+	FCAOutData[2][2] = FCAKData[10][0] * d_r + FCAKData[10][1]*dd_r;	
 	
 	//给定回馈量
 	FCAOutData[15][2] = yaw_tar;
@@ -501,9 +507,9 @@ void FCAHei()
 	h_cmd = FCATarData[0][2];
 	h_now = FCAOutData[7][2];//导航系
 	
-	if(RunState>=MODETargetP&&RunState<=MODETargetX)
+	if(RunState>=MODETargetP&&RunState<=MODETargetX&& FCATarData[2][1]==1)
 	{
-		h_rem = FCAOutData[5][0]*20;		//+-20m
+		h_rem = (FCAOutData[5][0]-FCAMedianData[5][0])*20;		//+-20m
 	}
 	else
 		h_rem = 0;
@@ -559,7 +565,9 @@ void FCAHei()
 	d_w_last = d_w;
 	
 	//PD 输出舵量 总距
-	FCAOutData[3][0] = FCAKData[13][0] * d_w - FCAKData[13][1]*dd_w;
+	FCAOutData[3][0] = FCAKData[13][0] * d_w + FCAKData[13][1]*dd_w;
+	//油门为零；
+	FCAOutData[3][1] = 0;
 }
 
 //当转换为自动驾驶模式时刻标记为0
@@ -574,6 +582,9 @@ void SmoothPWM(uint8 Long)
 		PWMOut[0]=(PWMIn[0]*(Long-OnSwitchAuto)+PWMOut[0]*OnSwitchAuto)/Long;
 		PWMOut[1]=(PWMIn[1]*(Long-OnSwitchAuto)+PWMOut[1]*OnSwitchAuto)/Long;
 		PWMOut[2]=(PWMIn[2]*(Long-OnSwitchAuto)+PWMOut[2]*OnSwitchAuto)/Long;
+		PWMOut[3]=(PWMIn[3]*(Long-OnSwitchAuto)+PWMOut[3]*OnSwitchAuto)/Long;
+		PWMOut[4]=(PWMIn[4]*(Long-OnSwitchAuto)+PWMOut[4]*OnSwitchAuto)/Long;
+		
 		OnSwitchAuto++;
 	}
 }
@@ -582,10 +593,23 @@ void SmoothPWM(uint8 Long)
 //调试时，通过混控模式完成局部自主+局部手动；
 void FCAPWMOut()
 {
-	//手动控制模式Manual
-	//混合控制模式Mix
 	int i;
+	
+	FCAPosXY();
+	FCAVelXY();
+	FCAYaw();
+	FCAHei();
+	
 	FCALimitPWM();
+
+	//更新中位数据，必须每次都更新FCAOutData中的舵量值，不然增加中位后会发生累加错误；
+	//目前如果同时调用所有算法，问题可以解决；
+	FCAOutData[2][0]=FCAOutData[2][0]+FCAMedianData[4][0];
+	FCAOutData[2][1]=FCAOutData[2][1]+FCAMedianData[4][1];
+	FCAOutData[2][2]=FCAOutData[2][2]+FCAMedianData[4][2];
+	FCAOutData[3][0]=FCAOutData[3][0]+FCAMedianData[5][0];
+	FCAOutData[3][1]=FCAOutData[3][1]+FCAMedianData[5][1];
+	//自主遥控、位置遥控、速度遥控、姿态遥控；
 	if(RunState>=MODETarget0&&RunState<=MODETargetX)
 	{
 		PWMOut[0]=FCAOutData[2][0]*FCATarData[3][0]+FCAOutData[4][0]*(1-FCATarData[3][0]);
@@ -593,19 +617,34 @@ void FCAPWMOut()
 		PWMOut[2]=FCAOutData[2][2]*FCATarData[3][2]+FCAOutData[4][2]*(1-FCATarData[3][2]);
 		PWMOut[3]=FCAOutData[3][0]*FCATarData[4][0]+FCAOutData[5][0]*(1-FCATarData[4][0]);
 		PWMOut[4]=FCAOutData[3][1]*FCATarData[4][1]+FCAOutData[5][1]*(1-FCATarData[4][1]);
+	
+		//再次进行限位；
+		for (i=0;i<5;i++)
+		{
+			if(PWMOut[i]>1)
+				PWMOut[i]=1;
+			else if(PWMOut[i]<-1)
+				PWMOut[i]=-1;
+		}
+		
 	}
-	//中位数据
-	PWMOut[0]+=FCAMedianData[4][0];
-	PWMOut[1]+=FCAMedianData[4][1];
-	PWMOut[2]+=FCAMedianData[4][2];
-	PWMOut[3]+=FCAMedianData[5][0];
-	PWMOut[4]+=FCAMedianData[5][1];
-	//再次进行限位；
-	for (i=0;i<5;i++)
+	//手动控制模式Manual
+	//混合控制模式Mix
+	else
 	{
-		if(PWMOut[i]>1)
-			PWMOut[i]=1;
-		else if(PWMOut[i]<-1)
-			PWMOut[i]=-1;
-	}	
+		PWMOut[0]=FCAOutData[4][0];
+		PWMOut[1]=FCAOutData[4][0];
+		PWMOut[2]=FCAOutData[4][0];
+		PWMOut[3]=FCAOutData[4][0];
+		PWMOut[4]=FCAOutData[4][0];
+	}
+	
+	
+	//舵机输出量A1s，B1s，At，安排在0x56上；
+	FCAOutData[6][0]=PWMOut[0];
+	FCAOutData[6][1]=PWMOut[1];
+	FCAOutData[6][2]=PWMOut[2];
+	//剩余两个量，安排在0x51上，
+	FCAOutData[1][1]=PWMOut[3];
+	FCAOutData[1][2]=PWMOut[4];
 }
