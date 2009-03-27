@@ -56,7 +56,7 @@ uint8 QueueInsert( QueueObj* Obj,uint8 c)
     }
     else
     {
-        Obj->Count++;
+        Obj->Count+=2;
         return FALSE;
     }
 }
