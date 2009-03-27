@@ -37,13 +37,19 @@ void FCALimitPWM()
 //获取导航信息和遥控器控制量信息
 void FCAGetNav()
 {
-	float pp,rr,yy;
+	float yy;
 		
 	//导航系位置 m
 	LTLK=cos((double)INSFrameObj.La*3.14/180.0/600000.0);
 	FCAOutData[7][0]=INSFrameObj.La*MtMk;
 	FCAOutData[7][1]=INSFrameObj.Lo*LTLK*MtMk;
-	FCAOutData[7][2]=INSFrameObj.Height/100;
+	FCAOutData[7][2]=INSFrameObj.Height/1000;
+	
+	//20090318 使用中位位置作为位置起点；
+	FCAOutData[7][0]-=FCAMedianData[0][0];
+	FCAOutData[7][1]-=FCAMedianData[0][1];
+	FCAOutData[7][2]-=FCAMedianData[0][2];
+	
 	//导航系速度 m/s
 	FCAOutData[8][0]=INSFrameObj.SpeedN/100.0;
 	FCAOutData[8][1]=INSFrameObj.SpeedE/100.0;
@@ -65,12 +71,12 @@ void FCAGetNav()
 	//本体系位置（纠正航向角）
 	FCAOutData[11][0]= cos(yy) * FCAOutData[7][0] + sin(yy) * FCAOutData[7][1];
 	FCAOutData[11][1]=(-sin(yy)) * FCAOutData[7][0] + cos(yy) * FCAOutData[7][1];
-	FCAOutData[11][2]=- FCAOutData[7][2];		//z轴向上；
+	FCAOutData[11][2]= FCAOutData[7][2];		//z轴向上；
 
 	//本体系速度1 1m/s
 	FCAOutData[12][0]=INSFrameObj.SpeedBodyX/100.0;
 	FCAOutData[12][1]=INSFrameObj.SpeedBodyY/100.0;
-	FCAOutData[12][2]=-INSFrameObj.SpeedBodyZ/100.0;//z轴向上；
+	FCAOutData[12][2]=INSFrameObj.SpeedBodyZ/100.0;//z轴向上；
 					
 	//本体系速度2解算 0.01m/s
 	
@@ -92,8 +98,53 @@ void FCAGetNav()
 	FCAOutData[6][2]=PWMIn[8];
 }
 
+
 //获取悬停点信息
 fp32 FCAMedianDataTmp[6][3];
+
+
+/*void FCACollectPosYaw(uint8 Long)
+{
+	uint8 i;
+	if(CollectMedianDataState==0)
+	{
+		memset(FCAMedianDataTmp,0,sizeof(fp32)*3*6);
+	}
+	if(CollectMedianDataState<Long)
+	{
+
+		for(i=0;i<3;i++)
+		{
+			FCAMedianDataTmp[0][i]+=FCAOutData[7][i];//导航系位置；
+			//FCAMedianDataTmp[1][i]+=FCAOutData[12][i];//本体系速度 ，实际上一直为零；
+			FCAMedianDataTmp[2][i]+=FCAOutData[9][i];//姿态；
+			//FCAMedianDataTmp[3][i]+=FCAOutData[10][i];//角速度，实际上应该为零；
+			//FCAMedianDataTmp[4][i]+=FCAOutData[4][i];//控制量：俯仰、滚转、偏航；
+			//FCAMedianDataTmp[5][i]+=FCAOutData[5][i];//控制量：总距，油门；
+		}
+		CollectMedianDataState++;
+	}
+	else if(CollectMedianDataState==Long)
+	{
+		//位置
+		FCAMedianData[0][0] = FCAMedianDataTmp[0][0];
+		FCAMedianData[0][1] = FCAMedianDataTmp[0][1];
+		FCAMedianData[0][2] = FCAMedianDataTmp[0][2];
+		//航向角
+		FCAMedianData[2][2] = FCAMedianDataTmp[2][2];
+
+		FCEventSend(CollectMedianData);
+		DataSendFlag[0x60]=DataSendFlag[0x60]|0x01;
+		//DataSendFlag[0x61]=DataSendFlag[0x61]|0x01;
+		DataSendFlag[0x62]=DataSendFlag[0x62]|0x01;
+		//DataSendFlag[0x63]=DataSendFlag[0x63]|0x01;
+		//DataSendFlag[0x64]=DataSendFlag[0x64]|0x01;
+		//DataSendFlag[0x65]=DataSendFlag[0x65]|0x01;
+		CollectMedianDataState=0xFF;
+	}
+	i_x = 0;i_y=0;i_h=0;i_yaw = 0;
+}
+*/
 
 void FCACollectMedianDataFun(uint8 Long)
 {
@@ -302,8 +353,8 @@ void FCAVelXY()
 	// 1速度遥控
 	if(RunState==MODETargetV)
 	{
-		u_rem = FCAOutData[4][0]*500;	//-5~5 对应 -5m/s~5m/s
-		v_rem = FCAOutData[4][1]*500; //
+		u_rem = FCAOutData[4][0]*50;	//-5~5 对应 -0.5m/s~0.5m/s
+		v_rem = FCAOutData[4][1]*50; //
 	}
 	else
 	{

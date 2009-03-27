@@ -105,6 +105,8 @@ void SwitchMode()
 			{
 				OnSwitchAuto=0;				
 			}
+			//新加的获取中位函数；
+			//FCACollectPosYaw(40);
 			ChangeRunMode(PreAutoMode);
 			ManualCount=0;
 			AutoCount=0;
